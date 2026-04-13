@@ -4,149 +4,133 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI 면접 코디네이터</title>
-    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
-    
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap');
-        body { font-family: 'Inter', sans-serif; background-color: #F8FAFC; }
-        .loading-spinner { border-top-color: #2563EB; animation: spin 1s linear infinite; }
+        body { background-color: #f1f5f9; font-family: sans-serif; }
+        .spinner { border: 3px solid #f3f3f3; border-top: 3px solid #3498db; border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
-<body>
-    <div id="root"></div>
+<body class="pb-20">
 
-    <script type="text/babel">
-        const { useState, useRef, useEffect } = React;
+    <div class="max-w-md mx-auto bg-white min-h-screen shadow-lg">
+        <header class="p-5 border-b flex justify-between items-center bg-white sticky top-0 z-10">
+            <h1 class="text-xl font-bold text-blue-600">👔 AI Fit-Test</h1>
+            <button onclick="toggleSettings()" class="text-gray-400 text-sm">설정</button>
+        </header>
 
-        const App = () => {
-            const [apiKey, setApiKey] = useState(localStorage.getItem('GEMINI_API_KEY') || '');
-            const [showKeyInput, setShowKeyInput] = useState(!apiKey);
-            const [userImage, setUserImage] = useState(null);
-            const [clothingImage, setClothingImage] = useState(null);
-            const [displayImage, setDisplayImage] = useState(null);
-            const [evaluation, setEvaluation] = useState(null);
-            const [loading, setLoading] = useState(false);
+        <div id="settingsPanel" class="hidden p-5 bg-blue-50 border-b">
+            <p class="text-xs font-bold mb-2 text-blue-700">Gemini API Key</p>
+            <input type="password" id="apiKeyInput" placeholder="키를 입력하세요" class="w-full p-2 border rounded-lg text-sm mb-2">
+            <button onclick="saveKey()" class="w-full bg-blue-600 text-white py-2 rounded-lg text-sm font-bold">저장</button>
+        </div>
 
-            const userFileRef = useRef(null);
-            const clothingFileRef = useRef(null);
-
-            // Lucide 아이콘 렌더링
-            useEffect(() => { if (window.lucide) window.lucide.createIcons(); }, [loading, evaluation, showKeyInput]);
-
-            const saveApiKey = (e) => {
-                e.preventDefault();
-                localStorage.setItem('GEMINI_API_KEY', apiKey);
-                setShowKeyInput(false);
-            };
-
-            const handleFileUpload = (e, type) => {
-                const file = e.target.files[0];
-                if (file) {
-                    const reader = new FileReader();
-                    reader.onloadend = () => {
-                        if (type === 'user') { setUserImage(reader.result); setDisplayImage(reader.result); }
-                        else { setClothingImage(reader.result); }
-                    };
-                    reader.readAsDataURL(file);
-                }
-            };
-
-            const onEvaluate = async () => {
-                if (!apiKey) { setShowKeyInput(true); return; }
-                setLoading(true);
-                // 데모를 위한 지연 시간 (실제 API 호출 시에는 fetch 로직이 들어갑니다)
-                setTimeout(() => {
-                    setEvaluation({
-                        score: 92,
-                        tags: ["신뢰감", "깔끔한", "정석면접룩"],
-                        silhouette: "전반적으로 핏이 아주 훌륭합니다. 어깨선이 잘 맞아서 단정한 인상을 줍니다.",
-                        advice: "넥타이 매듭을 조금 더 단단하게 매시면 완벽할 것 같습니다."
-                    });
-                    setLoading(false);
-                }, 2000);
-            };
-
-            return (
-                <div className="min-h-screen pb-10">
-                    {/* API Key Modal */}
-                    {showKeyInput && (
-                        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
-                            <form onSubmit={saveApiKey} className="bg-white p-8 rounded-3xl w-full max-w-sm shadow-2xl">
-                                <h2 className="text-xl font-bold mb-2">Gemini API Key</h2>
-                                <p className="text-sm text-gray-500 mb-6">특강 실습을 위해 키를 입력해주세요.</p>
-                                <input 
-                                    type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)}
-                                    placeholder="AI Studio에서 받은 키 붙여넣기"
-                                    className="w-full border-2 border-gray-100 p-4 rounded-2xl mb-4 outline-none focus:border-blue-500 transition-all"
-                                />
-                                <button className="w-full bg-blue-600 text-white py-4 rounded-2xl font-bold shadow-lg shadow-blue-200">시작하기</button>
-                            </form>
-                        </div>
-                    )}
-
-                    <header className="bg-white/80 backdrop-blur-md border-b px-6 py-4 sticky top-0 z-10 flex items-center justify-between">
-                        <h1 className="text-xl font-black text-blue-600 flex items-center gap-2">👔 AI Fit-Test</h1>
-                        <button onClick={() => setShowKeyInput(true)} className="p-2 text-gray-400"><i data-lucide="settings"></i></button>
-                    </header>
-
-                    <main className="max-w-md mx-auto p-4 space-y-6">
-                        <div className="grid grid-cols-2 gap-4">
-                            <div onClick={() => userFileRef.current.click()} className="aspect-square bg-white border-2 border-dashed rounded-3xl flex flex-col items-center justify-center cursor-pointer overflow-hidden relative border-gray-200">
-                                {userImage ? <img src={userImage} className="w-full h-full object-cover" /> : <div className="text-center"><i data-lucide="user" className="mx-auto text-gray-300 mb-1"></i><span className="text-[10px] text-gray-400 font-bold uppercase">My Photo</span></div>}
-                                <input type="file" ref={userFileRef} className="hidden" onChange={(e) => handleFileUpload(e, 'user')} />
-                            </div>
-                            <div onClick={() => clothingFileRef.current.click()} className="aspect-square bg-white border-2 border-dashed rounded-3xl flex flex-col items-center justify-center cursor-pointer overflow-hidden relative border-gray-200">
-                                {clothingImage ? <img src={clothingImage} className="w-full h-full object-cover" /> : <div className="text-center"><i data-lucide="shirt" className="mx-auto text-gray-300 mb-1"></i><span className="text-[10px] text-gray-400 font-bold uppercase">Outfit</span></div>}
-                                <input type="file" ref={clothingFileRef} className="hidden" onChange={(e) => handleFileUpload(e, 'clothing')} />
-                            </div>
-                        </div>
-
-                        <div className="flex gap-2">
-                            <button onClick={onEvaluate} className="flex-1 bg-white border-2 border-gray-100 py-4 rounded-2xl font-bold flex items-center justify-center gap-2 active:scale-95 transition-transform shadow-sm text-gray-700">현재 복장 평가</button>
-                            <button className="flex-1 bg-blue-600 text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-2 active:scale-95 transition-transform shadow-lg shadow-blue-100">의상 합성</button>
-                        </div>
-
-                        <div className="relative aspect-[3/4] bg-white rounded-[2rem] shadow-2xl overflow-hidden border-4 border-white">
-                            {displayImage ? <img src={displayImage} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-gray-300 italic">No image selected</div>}
-                            {loading && (
-                                <div className="absolute inset-0 bg-white/80 flex items-center justify-center flex-col gap-4">
-                                    <div className="w-12 h-12 border-4 border-gray-100 loading-spinner rounded-full"></div>
-                                    <p className="font-bold text-blue-600 animate-pulse">AI 전문가가 분석 중...</p>
-                                </div>
-                            )}
-                        </div>
-
-                        {evaluation && (
-                            <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                                <div className="bg-slate-900 p-8 rounded-[2rem] text-white shadow-xl">
-                                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Professionalism Score</p>
-                                    <div className="flex items-baseline gap-2 mb-6">
-                                        <span className="text-6xl font-black">{evaluation.score}</span>
-                                        <span className="text-xl text-slate-600">/100</span>
-                                    </div>
-                                    <div className="flex flex-wrap gap-2">
-                                        {evaluation.tags.map((tag, i) => <span key={i} className="px-4 py-1.5 bg-slate-800 rounded-full text-xs font-bold text-blue-400"># {tag}</span>)}
-                                    </div>
-                                </div>
-                                <div className="bg-white p-6 rounded-2xl border border-gray-100">
-                                    <h3 className="text-xs font-black text-gray-400 uppercase mb-3">Silhouette & Advice</h3>
-                                    <p className="text-sm text-gray-700 leading-relaxed mb-4">{evaluation.silhouette}</p>
-                                    <div className="p-4 bg-blue-50 rounded-xl text-sm text-blue-700 font-medium">💡 {evaluation.advice}</div>
-                                </div>
-                            </div>
-                        )}
-                    </main>
+        <main class="p-4 space-y-6">
+            <div class="grid grid-cols-2 gap-4">
+                <div onclick="document.getElementById('userFile').click()" class="aspect-square bg-gray-50 border-2 border-dashed border-gray-200 rounded-2xl flex flex-col items-center justify-center cursor-pointer overflow-hidden">
+                    <div id="userPlaceholder">
+                        <p class="text-[10px] text-gray-400 font-bold">나의 사진</p>
+                    </div>
+                    <img id="userPreview" class="hidden w-full h-full object-cover">
+                    <input type="file" id="userFile" class="hidden" accept="image/*" onchange="previewImg(this, 'user')">
                 </div>
-            );
-        };
+                <div onclick="document.getElementById('outfitFile').click()" class="aspect-square bg-gray-50 border-2 border-dashed border-gray-200 rounded-2xl flex flex-col items-center justify-center cursor-pointer overflow-hidden">
+                    <div id="outfitPlaceholder">
+                        <p class="text-[10px] text-gray-400 font-bold">의상 사진</p>
+                    </div>
+                    <img id="outfitPreview" class="hidden w-full h-full object-cover">
+                    <input type="file" id="outfitFile" class="hidden" accept="image/*" onchange="previewImg(this, 'outfit')">
+                </div>
+            </div>
 
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
+            <div class="flex gap-2">
+                <button onclick="startAnalyze()" class="flex-1 bg-gray-800 text-white py-4 rounded-2xl font-bold active:scale-95 transition-transform">현재 복장 평가</button>
+                <button onclick="startAnalyze()" class="flex-1 bg-blue-600 text-white py-4 rounded-2xl font-bold active:scale-95 transition-transform shadow-lg">의상 합성</button>
+            </div>
+
+            <div class="relative aspect-[3/4] bg-gray-100 rounded-[2rem] overflow-hidden border-4 border-white shadow-inner flex items-center justify-center">
+                <div id="emptyMsg" class="text-gray-300 italic text-sm text-center p-10">사진을 등록하고<br>평가 버튼을 눌러주세요</div>
+                <img id="mainView" class="hidden w-full h-full object-cover">
+                
+                <div id="loadingOverlay" class="hidden absolute inset-0 bg-white/80 flex flex-col items-center justify-center gap-3">
+                    <div class="spinner"></div>
+                    <p class="text-blue-600 font-bold text-sm">AI 분석 중...</p>
+                </div>
+            </div>
+
+            <div id="reportArea" class="hidden space-y-4 pb-10">
+                <div class="bg-gray-900 p-6 rounded-3xl text-white">
+                    <p class="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Professionalism Score</p>
+                    <div class="flex items-baseline gap-1">
+                        <span class="text-5xl font-black">92</span>
+                        <span class="text-lg text-gray-600">/100</span>
+                    </div>
+                </div>
+                <div class="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
+                    <h3 class="text-xs font-black text-gray-400 uppercase mb-2">AI 분석 결과</h3>
+                    <p class="text-sm text-gray-600 leading-relaxed">
+                        전반적으로 깔끔한 인상을 줍니다. 셔츠의 깃이 정돈되어 있어 신뢰감을 주기에 충분합니다. 넥타이의 색상도 조화롭습니다.
+                    </p>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // 초기 설정
+        const apiKey = localStorage.getItem('GEMINI_API_KEY');
+        if(!apiKey) document.getElementById('settingsPanel').classList.remove('hidden');
+
+        function toggleSettings() {
+            document.getElementById('settingsPanel').classList.toggle('hidden');
+        }
+
+        function saveKey() {
+            const val = document.getElementById('apiKeyInput').value;
+            if(val) {
+                localStorage.setItem('GEMINI_API_KEY', val);
+                alert('API 키가 저장되었습니다.');
+                toggleSettings();
+            }
+        }
+
+        function previewImg(input, type) {
+            if (input.files && input.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const preview = document.getElementById(type + 'Preview');
+                    const placeholder = document.getElementById(type + 'Placeholder');
+                    const mainView = document.getElementById('mainView');
+                    const emptyMsg = document.getElementById('emptyMsg');
+
+                    preview.src = e.target.result;
+                    preview.classList.remove('hidden');
+                    placeholder.classList.add('hidden');
+
+                    if(type === 'user') {
+                        mainView.src = e.target.result;
+                        mainView.classList.remove('hidden');
+                        emptyMsg.classList.add('hidden');
+                    }
+                }
+                reader.readAsDataURL(input.files[0]);
+            }
+        }
+
+        function startAnalyze() {
+            const loader = document.getElementById('loadingOverlay');
+            const report = document.getElementById('reportArea');
+            
+            loader.classList.remove('hidden');
+            report.classList.add('hidden');
+
+            // 2초 뒤 결과 표시 (시뮬레이션)
+            setTimeout(() => {
+                loader.classList.add('hidden');
+                report.classList.remove('hidden');
+                window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+            }, 2000);
+        }
     </script>
 </body>
 </html>
