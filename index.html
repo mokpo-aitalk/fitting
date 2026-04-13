@@ -1,13 +1,239 @@
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>My Google AI Studio App</title>
-  </head>
-  <body>
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 면접 코디네이터</title>
+    <!-- 라이브러리 로드 -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://unpkg.com/framer-motion@10.16.4/dist/framer-motion.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
+    
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .font-serif { font-family: 'Georgia', serif; }
+    </style>
+    
+    <script>
+        // Tailwind 설정
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#2563EB',
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-[#F8FAFC]">
     <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
-</html>
 
+    <script type="text/babel">
+        const { useState, useRef, useEffect } = React;
+        const { motion, AnimatePresence } = FramerMotion;
+
+        // Lucide 아이콘 컴포넌트 래퍼
+        const Icon = ({ name, className }) => {
+            const [iconHtml, setIconHtml] = useState('');
+            useEffect(() => {
+                if (window.lucide) {
+                    const icon = window.lucide.icons[name];
+                    if (icon) setIconHtml(icon.toSvg({ class: className }));
+                }
+            }, [name, className]);
+            return <span dangerouslySetInnerHTML={{ __html: iconHtml }} />;
+        };
+
+        // --- Gemini API Logic (Inline) ---
+        // ESM 모듈을 동적으로 불러오기 위해 esm.sh 사용
+        let GoogleGenAI;
+        import('https://esm.sh/@google/genai').then(mod => {
+            GoogleGenAI = mod.GoogleGenAI;
+        });
+
+        const App = () => {
+            const [apiKey, setApiKey] = useState(localStorage.getItem('GEMINI_API_KEY') || '');
+            const [showKeyInput, setShowKeyInput] = useState(!apiKey);
+            const [userImage, setUserImage] = useState(null);
+            const [clothingImage, setClothingImage] = useState(null);
+            const [displayImage, setDisplayImage] = useState(null);
+            const [evaluation, setEvaluation] = useState(null);
+            const [customAdvice, setCustomAdvice] = useState(null);
+            const [loading, setLoading] = useState(false);
+            const [prompt, setPrompt] = useState('');
+
+            const userFileRef = useRef(null);
+            const clothingFileRef = useRef(null);
+
+            const saveApiKey = (e) => {
+                e.preventDefault();
+                localStorage.setItem('GEMINI_API_KEY', apiKey);
+                setShowKeyInput(false);
+                alert('API 키가 저장되었습니다.');
+            };
+
+            const handleFileUpload = (e, type) => {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onloadend = () => {
+                        const base64 = reader.result;
+                        if (type === 'user') {
+                            setUserImage(base64);
+                            setDisplayImage(base64);
+                        } else {
+                            setClothingImage(base64);
+                        }
+                    };
+                    reader.readAsDataURL(file);
+                }
+            };
+
+            const getAI = () => {
+                if (!GoogleGenAI || !apiKey) {
+                    alert('API 키를 먼저 설정해주세요.');
+                    setShowKeyInput(true);
+                    return null;
+                }
+                return new GoogleGenAI({ apiKey });
+            };
+
+            const onEvaluate = async () => {
+                const ai = getAI();
+                if (!ai || !userImage) return;
+                setLoading(true);
+                try {
+                    const response = await ai.models.generateContent({
+                        model: "gemini-1.5-flash",
+                        contents: [{
+                            parts: [
+                                { text: "Analyze this interview outfit. Provide score(0-100), silhouette evaluation, stylist advice, and 3 hashtags. ALL IN KOREAN. Return JSON: {score, silhouette, advice, tags:[]}" },
+                                { inlineData: { mimeType: "image/jpeg", data: userImage.split(',')[1] } }
+                            ]
+                        }],
+                        config: { responseMimeType: "application/json" }
+                    });
+                    setEvaluation(JSON.parse(response.text));
+                    setCustomAdvice(null);
+                } catch (error) {
+                    alert('에러 발생: ' + error.message);
+                } finally { setLoading(false); }
+            };
+
+            const onSynthesize = async () => {
+                const ai = getAI();
+                if (!ai || !userImage || !clothingImage) return;
+                setLoading(true);
+                try {
+                    const response = await ai.models.generateContent({
+                        model: "gemini-1.5-flash",
+                        contents: [{
+                            parts: [
+                                { inlineData: { mimeType: "image/jpeg", data: userImage.split(',')[1] } },
+                                { inlineData: { mimeType: "image/jpeg", data: clothingImage.split(',')[1] } },
+                                { text: "Synthesize the clothing from the second image onto the person in the first image. Return only the image." }
+                            ]
+                        }]
+                    });
+                    const part = response.candidates[0].content.parts.find(p => p.inlineData);
+                    if (part) setDisplayImage(`data:${part.inlineData.mimeType};base64,${part.inlineData.data}`);
+                    setEvaluation(null);
+                    setCustomAdvice("의상 합성이 완료되었습니다!");
+                } catch (error) {
+                    alert('합성 에러: ' + error.message);
+                } finally { setLoading(false); }
+            };
+
+            const onReset = () => {
+                setUserImage(null); setClothingImage(null); setDisplayImage(null);
+                setEvaluation(null); setCustomAdvice(null); setPrompt('');
+            };
+
+            return (
+                <div className="min-h-screen pb-24">
+                    {/* API Key Modal */}
+                    {showKeyInput && (
+                        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+                            <form onSubmit={saveApiKey} className="bg-white p-6 rounded-2xl w-full max-w-sm shadow-2xl">
+                                <h2 className="text-lg font-bold mb-4">Gemini API 키 설정</h2>
+                                <input 
+                                    type="password" 
+                                    value={apiKey} 
+                                    onChange={(e) => setApiKey(e.target.value)}
+                                    placeholder="API 키를 입력하세요"
+                                    className="w-full border p-3 rounded-xl mb-4 outline-none focus:ring-2 focus:ring-blue-500"
+                                />
+                                <button className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold">저장하기</button>
+                                <p className="text-[10px] text-gray-400 mt-2 text-center">키는 브라우저의 LocalStorage에만 저장됩니다.</p>
+                            </form>
+                        </div>
+                    )}
+
+                    <header className="bg-white border-b px-6 py-4 sticky top-0 z-10 flex items-center justify-between">
+                        <h1 className="text-xl font-bold text-blue-600 flex items-center gap-2">
+                            <Icon name="Sparkles" className="w-6 h-6" /> AI 면접 코디네이터
+                        </h1>
+                        <div className="flex gap-2">
+                            <button onClick={() => setShowKeyInput(true)} className="p-2 text-gray-400 hover:text-blue-600"><Icon name="Settings" className="w-5 h-5" /></button>
+                            <button onClick={onReset} className="text-xs font-bold text-gray-500 px-3 py-1.5 rounded-lg hover:bg-red-50 hover:text-red-500">초기화</button>
+                        </div>
+                    </header>
+
+                    <main className="max-w-md mx-auto p-4 space-y-6">
+                        <div className="grid grid-cols-2 gap-4">
+                            <div onClick={() => userFileRef.current.click()} className="aspect-square bg-white border-2 border-dashed rounded-2xl flex flex-col items-center justify-center cursor-pointer overflow-hidden relative">
+                                {userImage ? <img src={userImage} className="w-full h-full object-cover" /> : <><Icon name="User" className="w-8 h-8 text-gray-400 mb-2" /><span className="text-xs text-gray-400">나의 사진</span></>}
+                                <input type="file" ref={userFileRef} className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, 'user')} />
+                            </div>
+                            <div onClick={() => clothingFileRef.current.click()} className="aspect-square bg-white border-2 border-dashed rounded-2xl flex flex-col items-center justify-center cursor-pointer overflow-hidden relative">
+                                {clothingImage ? <img src={clothingImage} className="w-full h-full object-cover" /> : <><Icon name="Shirt" className="w-8 h-8 text-gray-400 mb-2" /><span className="text-xs text-gray-400">의상 사진</span></>}
+                                <input type="file" ref={clothingFileRef} className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, 'clothing')} />
+                            </div>
+                        </div>
+
+                        <div className="flex gap-3">
+                            <button onClick={onEvaluate} disabled={!userImage || loading} className="flex-1 bg-white border py-3 rounded-xl font-semibold flex items-center justify-center gap-2 shadow-sm disabled:opacity-50">
+                                <Icon name="BarChart3" className="w-5 h-5 text-blue-600" /> 현재 복장 평가
+                            </button>
+                            <button onClick={onSynthesize} disabled={!userImage || !clothingImage || loading} className="flex-1 bg-blue-600 text-white py-3 rounded-xl font-semibold flex items-center justify-center gap-2 shadow-lg disabled:opacity-50">
+                                <Icon name="Sparkles" className="w-5 h-5" /> 새로운 의상 합성
+                            </button>
+                        </div>
+
+                        <div className="relative aspect-[3/4] bg-white rounded-3xl shadow-xl overflow-hidden border">
+                            {displayImage ? <img src={displayImage} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-gray-300">사진을 업로드해주세요</div>}
+                            {loading && <div className="absolute inset-0 bg-white/60 backdrop-blur-sm flex items-center justify-center flex-col gap-2"><Icon name="Loader2" className="w-10 h-10 text-blue-600 animate-spin" /><span className="text-sm font-medium text-blue-600">AI 분석 중...</span></div>}
+                        </div>
+
+                        {evaluation && (
+                            <div className="space-y-4">
+                                <div className="bg-[#1A1A1A] p-6 rounded-3xl shadow-2xl text-white relative">
+                                    <div className="absolute top-6 right-6 opacity-50"><Icon name="CheckCircle2" className="w-6 h-6" /></div>
+                                    <div className="space-y-1 mb-6">
+                                        <h3 className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Professionalism Score</h3>
+                                        <div className="flex items-baseline gap-2"><span className="text-5xl font-serif italic">{evaluation.score}</span><span className="text-lg text-gray-600">/100</span></div>
+                                    </div>
+                                    <div className="flex flex-wrap gap-2">
+                                        {evaluation.tags.map((tag, i) => <span key={i} className="px-3 py-1 bg-[#333] border border-[#444] rounded-full text-[10px] font-bold"># {tag.replace('#','')}</span>)}
+                                    </div>
+                                </div>
+                                <div className="bg-white p-5 rounded-2xl border"><h3 className="text-xs font-bold text-gray-400 uppercase mb-2">Silhouette Evaluation</h3><p className="text-sm text-gray-700">{evaluation.silhouette}</p></div>
+                                <div className="bg-white p-5 rounded-2xl border"><h3 className="text-xs font-bold text-gray-400 uppercase mb-2">Stylist's Advice</h3><p className="text-sm text-gray-700">{evaluation.advice}</p></div>
+                            </div>
+                        )}
+                    </main>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
